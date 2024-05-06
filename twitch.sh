@@ -1,44 +1,43 @@
 #!/bin/sh
 
-auth_file="${HOME}/.authentification/apikeys.sh"
+CONFIG_FILE="/etc/twitch.conf"
 
-# get my private twitch_clientID
-. "${HOME}/.authentification/apikeys.sh"
+. "$CONFIG_FILE"
 
-# colors from wpgtk/pywal
-. "${HOME}/.cache/wal/colors.sh"
+[ -z "$TWITCH_CLIENTID" ] && echo "TWITCH_CLIENTID" && exit 1
+[ -z "$TWITCH_SECRET" ] && echo "TWITCH_SECRET needed" && exit 1
+
+[ -z "$MENU_CMD" ] && MENU_CMD="dmenu"
+[ -z "$CHAT_CMD" ] && CHAT_CMD="firefox --new-window"
+[ -Z "$MAX_VID" ] && MAX_VID=100
 
 # Parameters
 
 CONFIG_DIR="${HOME}/.config/twitch"
+CACHE_DIR="${HOME}/.cache/twitch"
+
+ACCESS_TOKEN_CACHE_FILE="${CACHE_DIR}/access_token"
+touch "$ACCESS_TOKEN_CACHE_FILE"
+TWITCH_ACCESS_TOKEN=$(cat "$ACCESS_TOKEN_CACHE_FILE")
 
 CHANNELS_FILE="$CONFIG_DIR/listchanneltwitch"
 LAST_STREAM_FILE="$CONFIG_DIR/lastchannelviewed"
 GAMES_FILE="$CONFIG_DIR/listgamestwitch"
 
 gamesdb="${HOME}/.config/gamedatabase/gamesdb"
-chat_command="firefox --new-window"
-
-CACHE_DIR="${HOME}/.cache/twitch"
-
 
 API="https://api.twitch.tv/helix"
 
 TIME_FILE="$CACHE_DIR/vod_histo"
 TEMP_TIME=$(mktemp)
 
-max_vid=100
+
+[ -z "$MAX_VID" ] &&
 
 
 mkdir -p $CONFIG_DIR
 mkdir -p $CACHE_DIR
 
-
-if [ -n "$QUIETOPT" ]; then
-    menucmd="fzfcmd"
-else
-    menucmd="dmenu -nb $color0 -nf $color15 -sb $color3 -sf $color0"
-fi
 
 touch "$LAST_STREAM_FILE"
 
@@ -49,8 +48,8 @@ curl_get() {
     log "DATA: $data"
     log "opt: $opt"
     curl_output=$(curl -s \
-                     -H "Client-ID: $twitch_clientID" \
-                     -H "Authorization: Bearer $twitch_access_token" \
+                     -H "Client-ID: $TWITCH_CLIENTID" \
+                     -H "Authorization: Bearer $TWITCH_ACCESS_TOKEN" \
                      -H "Accept: application/json" \
                      -G "$API/$endpoint" \
                      $opt "$data")
@@ -84,14 +83,15 @@ log() {
 
 get_token(){
     curl -sX POST https://id.twitch.tv/oauth2/token \
-         --data "client_id=$twitch_clientID" \
-         --data "client_secret=$twitch_secret" \
+         --data "client_id=$TWITCH_CLIENTID" \
+         --data "client_secret=$TWITCH_SECRET" \
          --data "grant_type=client_credentials"
 }
 
 refresh_access_token(){
-    local token=$(get_token | jq -r '.access_token')
-    sed -i "s/\(^twitch_access_token=\).*/\1$token/" "$auth_file"
+    local token
+    token=$(get_token | jq -r '.access_token')
+    echo "$token" > "$ACCESS_TOKEN_CACHE_FILE"
 }
 
 
@@ -149,29 +149,29 @@ check_and_launch () {
     stream_list=$(echo $twitchdata | sed 's/\\n//g' | jq -r '.data[] | .language, .user_name, .title, .viewer_count' | awk '(NR%4==1){lg=$0}(NR%4==2){name=$0}(NR%4==3){title=$0}(NR%4==0){printf "%s:%s \"%s\" %s\n",lg,name,title,$0}')
     [ -z "$stream_list" ] && echoerror "No streams"
 
-    stream=$(echo "$stream_list" | $menucmd -i -l 10 -p "Streams: ") || aborted
+    stream=$(echo "$stream_list" | $MENU_CMD -i -l 10 -p "Streams: ") || aborted
 
     stream=$(echo "$stream" | sed 's/..:\([^ ]*\).*/\1/')
     echo "$stream" > "$LAST_STREAM_FILE"
-    [ -z "$QUIETOPT" ] && exec $chat_command "https://www.twitch.tv/popout/$stream/chat?darkpopout" & mpv "https://www.twitch.tv/$(echo $stream | tr [A-Z] [a-z])"
+    exec $CHAT_CMD "https://www.twitch.tv/popout/$stream/chat?darkpopout" & mpv "https://www.twitch.tv/$(echo $stream | tr [A-Z] [a-z])"
     exit
 }
 
 twitchgamefunction () {
-    game=$(echo "$(cat $GAMES_FILE)\n\nOther\nAdd Game" | $menucmd -l 15 -i -p "$noshit") || aborted
+    game=$(echo "$(cat $GAMES_FILE)\n\nOther\nAdd Game" | $MENU_CMD -l 15 -i -p "$noshit") || aborted
 
     case "$game" in
         "Add Game")
             local dprompt="Add game: "
-            game=$($menucmd -l 10 -i -p "$dprompt" < "$gamesdb") || aborted
+            game=$($MENU_CMD -l 10 -i -p "$dprompt" < "$gamesdb") || aborted
             echo "$game" >> "$GAMES_FILE"
 
             local dprompt="Do you want to check streams for $game? "
-            cert=$(printf "No\nYes" | $menucmd -l 10 -i -p "$dprompt")
+            cert=$(printf "No\nYes" | $MENU_CMD -l 10 -i -p "$dprompt")
             [ "$cert" = "Yes" ] || aborted
             ;;
         "Other")
-            game=$($menucmd -l 10 -i -p "$noshit" < "$gamesdb") || aborted
+            game=$($MENU_CMD -l 10 -i -p "$noshit" < "$gamesdb") || aborted
             check_and_launch "$game" ;;
         *)
             check_and_launch "$game" ;;
@@ -183,7 +183,7 @@ twitchlivefunction () {
     if [ -n "$streamer" ]; then
         echo "Checking if $streamer is live ..."
         test=$(curl_get streams "user_login=$streamer" | jq '.data | length' t)
-        [ ! "$test" = 0 ] && (exec $chat_command "https://www.twitch.tv/popout/$streamer/chat?darkpopout" & mpv "https://www.twitch.tv/$streamer") || echo "$streamer doesn't stream right now"
+        [ ! "$test" = 0 ] && (exec $CHAT_CMD "https://www.twitch.tv/popout/$streamer/chat?darkpopout" & mpv "https://www.twitch.tv/$streamer") || echo "$streamer doesn't stream right now"
         exit
     else
         echo "Checking connected streams ..."
@@ -196,16 +196,16 @@ twitchlivefunction () {
 
         streams_test=$(echo "$twitchdata" | jq -r '.data[] | .user_name, .game_id')
         [ -z "$streams_test" ] && aborted "Nothing found"
-        stream=$(echo "$streams_test" | while read a;do echo "$a" | grep -q "^[0-9]*$" && echo "$game_dico" | grep "$a" | sed 's/^[0-9]* //' || echo "$a";done | awk 'NR%2{printf "%14s : ",$0;next;}1' | $menucmd -l 10 -i -p "Streams: ") || aborted
+        stream=$(echo "$streams_test" | while read a;do echo "$a" | grep -q "^[0-9]*$" && echo "$game_dico" | grep "$a" | sed 's/^[0-9]* //' || echo "$a";done | awk 'NR%2{printf "%14s : ",$0;next;}1' | $MENU_CMD -l 10 -i -p "Streams: ") || aborted
         stream=$(echo "$stream" | sed 's/ *\([^ ]*\).*/\1/')
         echo "https://www.twitch.tv/$stream"
-        [ -z "$QUIETOPT" ] && exec $chat_command "https://www.twitch.tv/popout/$stream/chat?darkpopout" & mpv "https://www.twitch.tv/$stream"
+        exec $CHAT_CMD "https://www.twitch.tv/popout/$stream/chat?darkpopout" & mpv "https://www.twitch.tv/$stream"
         exit
     fi
 }
 
 twitchvod_search() {
-    searchingshit=$(sort "$CHANNELS_FILE" | $menucmd -i -l 10 -p "TwitchVOD Channel: ") || aborted
+    searchingshit=$(sort "$CHANNELS_FILE" | $MENU_CMD -i -l 10 -p "TwitchVOD Channel: ") || aborted
     printf "Searching for video on %s\n" "$searchingshit"
     curl_choose_and_watch
 }
@@ -217,8 +217,8 @@ __is_in_file() {
 
 __confirm() {
     local prompt=$1 check
-    check=$(echo | $menucmd -i -p "$prompt (Y/n)")
-    [ $check = "Y" ] || [ $check = "y" ] || [ -z $check ]
+    check=$(echo | $MENU_CMD -i -p "$prompt (Y/n)")
+    [ "$check" = "Y" ] || [ "$check" = "y" ] || [ -z "$check" ]
 }
 
 curl_choose_and_watch() {
@@ -226,13 +226,13 @@ curl_choose_and_watch() {
     #curl the api twitch vod search for a channel
     user_id=$(get_user_id "$searchingshit")
     [ -z "$user_id" ] && aborted "user id not found"
-    twitchvod=$(curl_get "videos" "user_id=$user_id&first=$max_vid")
+    twitchvod=$(curl_get "videos" "user_id=$user_id&first=$MAX_VID")
     total_vod=$(echo $twitchvod | sed 's/\\n//g' | jq -r '.data | length')
     [ "$total_vod" = "null" ] || [ "$total_vod" = 0 ] && twitchvod_search
 
     #create a table with all of the videos and get the url of the chosen one
-    : $(( borne_max=total_vod - max_vid ))
-    video=$(echo $twitchvod | jq -r '.data[] | .title, .created_at' | awk -v bm=$borne_max -v offs="$offset" 'BEGIN{ if (offs > 0 ) { printf "Prev\n" } }!(NR%2){printf ("%3d: %-100s %.10s\n", FNR/2+offs, p, $0)}{p=$0}END{ if (offs < bm) { printf "Next" } }' | $menucmd -i -l 30 -p "Which video: " | sed 's/:.*//')
+    : $(( borne_max=total_vod - MAX_VID ))
+    video=$(echo $twitchvod | jq -r '.data[] | .title, .created_at' | awk -v bm=$borne_max -v offs="$offset" 'BEGIN{ if (offs > 0 ) { printf "Prev\n" } }!(NR%2){printf ("%3d: %-100s %.10s\n", FNR/2+offs, p, $0)}{p=$0}END{ if (offs < bm) { printf "Next" } }' | $MENU_CMD -i -l 30 -p "Which video: " | sed 's/:.*//')
 
     if [ -z "$video" ];then
         twitchvod_search
@@ -256,7 +256,7 @@ curl_choose_and_watch() {
             } || start_opt=""
         fi
 
-        res=$(printf "720\n1080\n360" | $menucmd -i -p "Which resolution? (if avalaible): ") || twitchvod_search
+        res=$(printf "720\n1080\n360" | $MENU_CMD -i -p "Which resolution? (if avalaible): ") || twitchvod_search
         mpv "$start_opt" --ytdl-format="[height<=?$res]" "$videourl" > $TEMP_TIME || twitchvod_search
 
         last_time=$(grep "AV:" $TEMP_TIME)
@@ -280,13 +280,13 @@ _is_time_hhmmss() {
 }
 
 delete_streamer() {
-    streamer_to_delete=$(sort "$CHANNELS_FILE" | $menucmd -i -l 10 -p "Delete streamer: ")
+    streamer_to_delete=$(sort "$CHANNELS_FILE" | $MENU_CMD -i -l 10 -p "Delete streamer: ")
     grep -v "$streamer_to_delete" "$CHANNELS_FILE" > /tmp/chanshit && mv /tmp/chanshit "$CHANNELS_FILE"
 }
 
 twitchmenu() {
     laststreamer=$(cat "$LAST_STREAM_FILE")
-    choice=$(printf "LIVE\nGAMES\nVOD\n\nAdd last streamer: $laststreamer\nDelete streamer" | $menucmd -i -l 10 -p "Twitch Menu :")
+    choice=$(printf "LIVE\nGAMES\nVOD\n\nAdd last streamer: $laststreamer\nDelete streamer" | $MENU_CMD -i -l 10 -p "Twitch Menu :")
 
     case "$choice" in
         "LIVE")

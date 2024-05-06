@@ -7,10 +7,16 @@ arch=('i686' 'x86_64')
 url=""
 license=('GPL')
 depends=('mpv')
-# optdepends=()
-source=(twitch.sh)
-sha256sums=('2838f575bf87184f1dd7e538e89ada4714622c7dd802af5ae6627e4d2fe7eb57')
+optdepends=()
+backup=(etc/twitch.conf)
+source=(
+  twitch.sh
+  twitch.conf
+)
+sha256sums=('bbd7fbb2e9e45c31e1838709290b511eb859095eb5424d7b27a7df99afa825a0'
+            'b4498a92f391b7e1da268052bc691fe3c700a7c73479b4d358ba3cc7aed72777')
 
 package() {
+  install -Dm600 twitch.conf "$pkgdir/etc/twitch.conf"
   install -Dm755 twitch.sh "$pkgdir/usr/bin/twitch"
 }
