@@ -9,7 +9,7 @@ CONFIG_FILE="/etc/twitch.conf"
 
 [ -z "$MENU_CMD" ] && MENU_CMD="dmenu"
 [ -z "$CHAT_CMD" ] && CHAT_CMD="firefox --new-window"
-[ -Z "$MAX_VID" ] && MAX_VID=100
+[ -z "$MAX_VID" ] && MAX_VID=100
 
 # Parameters
 

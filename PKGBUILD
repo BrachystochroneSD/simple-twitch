@@ -1,9 +1,9 @@
 # Maintainer:  <samueld@mailo.com>
 pkgname=simple-twitch
-pkgver=0.1.0
+pkgver=0.1.2
 pkgrel=1
 pkgdesc="Simple script to access twitch simply"
-arch=('i686' 'x86_64')
+arch=(any)
 url=""
 license=('GPL')
 depends=('mpv')
@@ -13,8 +13,8 @@ source=(
   twitch.sh
   twitch.conf
 )
-sha256sums=('bbd7fbb2e9e45c31e1838709290b511eb859095eb5424d7b27a7df99afa825a0'
-            'b4498a92f391b7e1da268052bc691fe3c700a7c73479b4d358ba3cc7aed72777')
+sha256sums=('29387428fc29a059d29274c714ab7cf04dcbf9be539d2261f28552a9aa287539'
+            '6a30f61201159d53b23c2483135ed088e841f47fbbd95676bd23625d83dff529')
 
 package() {
   install -Dm600 twitch.conf "$pkgdir/etc/twitch.conf"
