@@ -319,11 +319,7 @@ twitchmenu() {
 check_internet
 
 case $1 in
-    --menu)
-        twitchmenu
-        ;;
-    --live)
-        twitchlivefunction "$2" ;;
+    --live) twitchlivefunction "$2" ;;
     --game)
         args=$(echo "$*" | sed "s/$1 *//")
         noshit="Choose a game: "
@@ -333,5 +329,6 @@ case $1 in
         offset=0
         twitchvod_search ;;
     --refresh-token) refresh_access_token ;;
-    *) echo "usage: twitchscript --live (stream name), --vod, --game (game) or --refresh-token" ;;
+    --help) echo "usage: twitchscript --live (stream name), --vod, --game (game) or --refresh-token" ;;
+    *) twitchmenu ;;
 esac
