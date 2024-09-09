@@ -34,28 +34,11 @@ TEMP_TIME=$(mktemp)
 
 [ -z "$MAX_VID" ] &&
 
-
 mkdir -p $CONFIG_DIR
 mkdir -p $CACHE_DIR
 
-
 touch "$LAST_STREAM_FILE"
 
-curl_get() {
-    local endpoint="$1" local data="$2" url_encode="$3" curl_output= opt= datas=
-    log "ENDPOINT: $endpoint"
-    [ -n "$url_encode" ] && opt="--data-urlencode" || opt="-d"
-    log "DATA: $data"
-    log "opt: $opt"
-    curl_output=$(curl -s \
-                     -H "Client-ID: $TWITCH_CLIENTID" \
-                     -H "Authorization: Bearer $TWITCH_ACCESS_TOKEN" \
-                     -H "Accept: application/json" \
-                     -G "$API/$endpoint" \
-                     $opt "$data")
-    log "CURL OUTPUT: $curl_output"
-    # handle_error "$curl_output"
-    echo $curl_output
 echoerror() {
     echo "$*"
     noshit="$*. Choose an other game:"
@@ -66,7 +49,7 @@ log() {
     local msg=$1 level=$2
     [ -z "$level" ] && level=1
     if [ -n "$VERBOSE" ] && [ $VERBOSE -ge $level ]; then
-        echo "$(date "+%F %T.%N")$msg" 1>&2
+        echo "$(date "+%F %T.%N"):$msg" 1>&2
     fi
 }
 
@@ -89,8 +72,31 @@ handle_error() {
     fi
 }
 
+curl_call() {
+    local opt=$1 data=$2 endpoint=$3
+    curl -s \
+         -H "Client-ID: $TWITCH_CLIENTID" \
+         -H "Authorization: Bearer $TWITCH_ACCESS_TOKEN" \
+         -H "Accept: application/json" \
+         -G "$API/$endpoint" \
+         $opt "$data"
 }
 
+curl_get() {
+    local endpoint="$1" data="$2" url_encode="$3" curl_output opt datas
+    log "ENDPOINT: $endpoint"
+    [ -n "$url_encode" ] && opt="--data-urlencode" || opt="-d"
+    log "DATA: $data"
+    log "opt: $opt"
+    curl_output=$(curl_call "$opt" "$data" "$endpoint")
+    log "CURL OUTPUT: $curl_output"
+    handle_error "$curl_output" || {
+        log "Token refresh done, retry call"
+        curl_output=$(curl_call "$opt" "$data")
+        log "CURL OUTPUT: $curl_output"
+    }
+    echo "$curl_output"
+}
 
 get_token(){
     curl -sX POST https://id.twitch.tv/oauth2/token \
