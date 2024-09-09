@@ -59,17 +59,21 @@ aborted() {
 }
 
 handle_error() {
-    local curl_out=$1 error status message
-    error=$(echo "$curl_out" | jq -r .error)
-    if [ "$error" != "null" ]; then
-        status=$(echo "$curl_out" | jq -r .status)
-        message=$(echo "$curl_out" | jq -r .message)
-        if [ "$status" = 401 ] && [ "$message" = "Invalid OAuth token" ]; then
-            refresh_access_token
-            return 2
-        fi
-        aborted "Error $status: $message"
+    local curl_out="$1" error status message
+    log "Handle Errors for $curl_out"
+    error=$(echo $curl_out | jq -r .error 2>/dev/null)
+    if [ -z "$error" ] || [ "$error" = "null" ]; then
+        log "No Error Found, continuing"
+        return 0
     fi
+    log "Error found: $error"
+    status=$(echo $curl_out | jq -r .status)
+    message=$(echo $curl_out | jq -r .message)
+    if [ "$status" = 401 ] && [ "$message" = "Invalid OAuth token" ]; then
+        refresh_access_token
+        return 2
+    fi
+    aborted "Error $status: $message"
 }
 
 curl_call() {
@@ -89,12 +93,13 @@ curl_get() {
     log "DATA: $data"
     log "opt: $opt"
     curl_output=$(curl_call "$opt" "$data" "$endpoint")
-    log "CURL OUTPUT: $curl_output"
-    handle_error "$curl_output" || {
+    log "CURL OUTPUT: $curl_output" 2
+    handle_error "$curl_output"
+    if [ $? -eq 2 ]; then
         log "Token refresh done, retry call"
         curl_output=$(curl_call "$opt" "$data")
-        log "CURL OUTPUT: $curl_output"
-    }
+        log "CURL OUTPUT: $curl_output" 2
+    fi
     echo "$curl_output"
 }
 
