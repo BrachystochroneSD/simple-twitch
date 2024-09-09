@@ -56,28 +56,39 @@ curl_get() {
     log "CURL OUTPUT: $curl_output"
     # handle_error "$curl_output"
     echo $curl_output
-}
-
-handle_error() {
-    local curl_out="$1"
-    local error=$(echo "$curl_out" | jq -r .error)
-    [ "$error" != "null" ] && {
-        local status=$(echo "$curl_out" | jq -r .status)
-        local message=$(echo "$curl_out" | jq -r .message)
-        if [ "$status" = 401 ]; then
-            refresh_access_token
-            aborted "Token refreshed please relaunch"
-        else
-            aborted "Error $status: $message"
-        fi
-    }
+echoerror() {
+    echo "$*"
+    noshit="$*. Choose an other game:"
+    twitchgamefunction
 }
 
 log() {
-    local level=0
-    local msg=$1
-    [ -n "$2" ] && level=$2
-    [ -n "$VERBOSE" ] && [ $VERBOSE -ge $level ] && echo "$msg" 1>&2
+    local msg=$1 level=$2
+    [ -z "$level" ] && level=1
+    if [ -n "$VERBOSE" ] && [ $VERBOSE -ge $level ]; then
+        echo "$(date "+%F %T.%N")$msg" 1>&2
+    fi
+}
+
+aborted() {
+    [ -n "$1" ] && notify-send "Error: $1"
+    exit 1
+}
+
+handle_error() {
+    local curl_out=$1 error status message
+    error=$(echo "$curl_out" | jq -r .error)
+    if [ "$error" != "null" ]; then
+        status=$(echo "$curl_out" | jq -r .status)
+        message=$(echo "$curl_out" | jq -r .message)
+        if [ "$status" = 401 ] && [ "$message" = "Invalid OAuth token" ]; then
+            refresh_access_token
+            return 2
+        fi
+        aborted "Error $status: $message"
+    fi
+}
+
 }
 
 
@@ -107,17 +118,6 @@ fzfcmd(){
     done
     [ -z "$prompt" ] && prompt=">"
     fzf --prompt="$prompt" "$iflag"
-}
-
-echoerror() {
-    echo "$*"
-    noshit="$*. Choose an other game:"
-    twitchgamefunction
-}
-
-aborted() {
-    [ -n "$1" ] && notify-send "Error: $1"
-    exit 1
 }
 
 check_internet() {
