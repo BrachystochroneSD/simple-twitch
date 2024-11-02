@@ -271,8 +271,8 @@ curl_choose_and_watch() {
         log "Command: mpv $start_opt --ytdl-format=\"[height<=?$res]\" $videourl"
         mpv "$start_opt" --ytdl-format="[height<=?$res]" "$videourl" > $TEMP_TIME || twitchvod_search
 
-        last_time=$(grep "AV:" $TEMP_TIME)
         log "TEMP_TIME_FILE_CONTENT: $(cat $TEMP_TIME)"
+        last_time=$(grep "AV:" $TEMP_TIME | tail -n1)
         rm -f "$TEMP_TIME"
         last_time=${last_time#* }
         last_time=${last_time%% *}
