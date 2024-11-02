@@ -233,7 +233,7 @@ __confirm() {
 }
 
 curl_choose_and_watch() {
-    local user_id last_time content start_opt
+    local user_id last_time content start_opt video_id
     #curl the api twitch vod search for a channel
     user_id=$(get_user_id "$searchingshit")
     [ -z "$user_id" ] && aborted "user id not found"
@@ -256,15 +256,15 @@ curl_choose_and_watch() {
     else
         : $(( num=video-1-offset ))
         videourl=$(echo $twitchvod | jq -r '.data['$num'].url')
+        video_id=${videourl##*/}
         echo "$videourl" | xclip -selection clipboard
         echo selection cliped
         # ask for the resolution and launch the video with mpv
-        if __is_in_file "$videourl" "$TIME_FILE"; then
-            start_opt=$(grep "$videourl" "$TIME_FILE")
+        if start_opt=$(grep "^$video_id" "$TIME_FILE");then
             start_opt=${start_opt#* }
             __confirm "Start at $start_opt ?" && {
                 start_opt="--start=$start_opt"
-            } || start_opt=""
+            } || start_opt=
         fi
 
         res=$(printf "720\n1080\n360" | $MENU_CMD -i -p "Which resolution? (if avalaible): ") || twitchvod_search
@@ -275,15 +275,16 @@ curl_choose_and_watch() {
         last_time=${last_time#* }
         last_time=${last_time%% *}
         content=$(cat "$TIME_FILE")
-        _is_time_hhmmss "$last_time" && _save_time_on_file "$videourl" "$last_time" "$TIME_FILE"
+        _is_time_hhmmss "$last_time" && _save_time_on_file "$video_id" "$last_time" "$TIME_FILE"
         exit
     fi
 }
 
 _save_time_on_file() {
-    local url=$1 time=$2 file=$3 content
-    content=$(grep -v "^$url" "$file")
-    echo "$content\n$url $time" > $file
+    local video_id=$1 time=$2 file=$3 content
+    content=$(grep -v "^$video_id" "$file")
+    log "Saving '$video_id' '$time' on '$file'"
+    echo "$content\n$video_id $time" > $file
 }
 
 _is_time_hhmmss() {
