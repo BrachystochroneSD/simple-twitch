@@ -268,9 +268,11 @@ curl_choose_and_watch() {
         fi
 
         res=$(printf "720\n1080\n360" | $MENU_CMD -i -p "Which resolution? (if avalaible): ") || twitchvod_search
+        log "Command: mpv $start_opt --ytdl-format=\"[height<=?$res]\" $videourl"
         mpv "$start_opt" --ytdl-format="[height<=?$res]" "$videourl" > $TEMP_TIME || twitchvod_search
 
         last_time=$(grep "AV:" $TEMP_TIME)
+        log "TEMP_TIME_FILE_CONTENT: $(cat $TEMP_TIME)"
         rm -f "$TEMP_TIME"
         last_time=${last_time#* }
         last_time=${last_time%% *}
