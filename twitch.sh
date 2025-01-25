@@ -11,26 +11,18 @@ CONFIG_FILE="/etc/twitch.conf"
 [ -z "$CHAT_CMD" ] && CHAT_CMD="firefox --new-window"
 [ -z "$MAX_VID" ] && MAX_VID=100
 
+
 # Parameters
 
-CONFIG_DIR="${HOME}/.config/twitch"
-CACHE_DIR="${HOME}/.cache/twitch"
+LIB_DIR="/usr/lib/simple-twitch"
 
-ACCESS_TOKEN_CACHE_FILE="${CACHE_DIR}/access_token"
-touch "$ACCESS_TOKEN_CACHE_FILE"
-TWITCH_ACCESS_TOKEN=$(cat "$ACCESS_TOKEN_CACHE_FILE")
+# TODELETE
+LIB_DIR="."
 
-CHANNELS_FILE="$CONFIG_DIR/listchanneltwitch"
-LAST_STREAM_FILE="$CONFIG_DIR/lastchannelviewed"
-GAMES_FILE="$CONFIG_DIR/listgamestwitch"
-
-gamesdb="${HOME}/.config/gamedatabase/gamesdb"
-
-API="https://api.twitch.tv/helix"
+. "$LIB_DIR/twitch_lib.sh"
 
 TIME_FILE="$CACHE_DIR/vod_histo"
 TEMP_TIME=$(mktemp)
-
 
 [ -z "$MAX_VID" ] &&
 
@@ -38,104 +30,6 @@ mkdir -p $CONFIG_DIR
 mkdir -p $CACHE_DIR
 
 touch "$LAST_STREAM_FILE"
-
-echoerror() {
-    echo "$*"
-    noshit="$*. Choose an other game:"
-    twitchgamefunction
-}
-
-log() {
-    local msg=$1 level=$2
-    [ -z "$level" ] && level=1
-    if [ -n "$VERBOSE" ] && [ $VERBOSE -ge $level ]; then
-        echo "$(date "+%F %T.%N"):$msg" 1>&2
-    fi
-}
-
-aborted() {
-    [ -n "$1" ] && notify-send "Error: $1"
-    exit 1
-}
-
-handle_error() {
-    local curl_out="$1" error status message
-    log "Handle Errors for $curl_out"
-    error=$(echo $curl_out | jq -r .error 2>/dev/null)
-    if [ -z "$error" ] || [ "$error" = "null" ]; then
-        log "No Error Found, continuing"
-        return 0
-    fi
-    log "Error found: $error"
-    status=$(echo $curl_out | jq -r .status)
-    message=$(echo $curl_out | jq -r .message)
-    if [ "$status" = 401 ] && [ "$message" = "Invalid OAuth token" ]; then
-        refresh_access_token
-        return 2
-    fi
-    aborted "Error $status: $message"
-}
-
-curl_call() {
-    local opt=$1 data=$2 endpoint=$3
-    curl -s \
-         -H "Client-ID: $TWITCH_CLIENTID" \
-         -H "Authorization: Bearer $TWITCH_ACCESS_TOKEN" \
-         -H "Accept: application/json" \
-         -G "$API/$endpoint" \
-         $opt "$data"
-}
-
-curl_get() {
-    local endpoint="$1" data="$2" url_encode="$3" curl_output opt datas
-    log "ENDPOINT: $endpoint"
-    [ -n "$url_encode" ] && opt="--data-urlencode" || opt="-d"
-    log "DATA: $data"
-    log "opt: $opt"
-    curl_output=$(curl_call "$opt" "$data" "$endpoint")
-    log "CURL OUTPUT: $curl_output" 2
-    handle_error "$curl_output"
-    if [ $? -eq 2 ]; then
-        log "Token refresh done, retry call"
-        curl_output=$(curl_call "$opt" "$data")
-        log "CURL OUTPUT: $curl_output" 2
-    fi
-    echo "$curl_output"
-}
-
-get_token(){
-    curl -sX POST https://id.twitch.tv/oauth2/token \
-         --data "client_id=$TWITCH_CLIENTID" \
-         --data "client_secret=$TWITCH_SECRET" \
-         --data "grant_type=client_credentials"
-}
-
-refresh_access_token(){
-    local token
-    token=$(get_token | jq -r '.access_token')
-    echo "$token" > "$ACCESS_TOKEN_CACHE_FILE"
-}
-
-
-fzfcmd(){
-    local prompt
-    local iflag
-    while getopts "ip:l:" opt; do
-        case $opt in
-            p) prompt=$OPTARG ;;
-            l) lflag=shit ;;
-            i) iflag="-i";;
-        esac
-    done
-    [ -z "$prompt" ] && prompt=">"
-    fzf --prompt="$prompt" "$iflag"
-}
-
-check_internet() {
-    if ! ping -q -c 1 -W 1 1.1.1.1 >/dev/null 2>&1; then
-        aborted "No internet connection"
-    fi
-}
 
 get_user_id() {
     log "Get User ID"
@@ -153,18 +47,46 @@ get_game_info () {
     echo $curl_data | jq -r ".data[] | .$key2"
 }
 
-check_and_launch () {
-    local game_name="$1" game_id=$(get_game_info "$1") twitchdata= stream_list= stream=
-    log "Checking connected streams for $game_name ..."
-    twitchdata=$(curl_get "streams" "game_id=$game_id" t)
-    stream_list=$(echo $twitchdata | sed 's/\\n//g' | jq -r '.data[] | .language, .user_name, .title, .viewer_count' | awk '(NR%4==1){lg=$0}(NR%4==2){name=$0}(NR%4==3){title=$0}(NR%4==0){printf "%s:%s \"%s\" %s\n",lg,name,title,$0}')
-    [ -z "$stream_list" ] && echoerror "No streams"
-
-    stream=$(echo "$stream_list" | $MENU_CMD -i -l 10 -p "Streams: ") || aborted
-
-    stream=$(echo "$stream" | sed 's/..:\([^ ]*\).*/\1/')
-    echo "$stream" > "$LAST_STREAM_FILE"
+launch_stream() {
+    stream=$1
+    echo "Launching Stream $stream"
     exec $CHAT_CMD "https://www.twitch.tv/popout/$stream/chat?darkpopout" & mpv "https://www.twitch.tv/$(echo $stream | tr [A-Z] [a-z])"
+}
+
+choose_stream() {
+    twitch_data=$1 auto_launch=$2
+
+    log "twitch_data: $1" 2
+    length=$(echo "$twitch_data" | jq -r '.data | length')
+    [ "$length" = 0 ] && aborted "Nothing found"
+
+    streams=$(echo "$twitch_data" | jq -r '.data[] | "\(.user_name);\(.game_name);\(.title);\(.language);\(.viewer_count)"') || aborted "Problem during parsing of jq data"
+
+    log "streams: $streams"
+    log "length: $length"
+
+    if [ -n "$auto_launch" ] && [ "$length" = 1 ]; then
+        log "Only one streamer found, launching it"
+        echo "$streams" | awk -F ";" '{print $1}'
+        return 0
+    fi
+
+    stream_list=$(echo "$streams" | awk -F ";" '{printf "(%s) %20s : %s \"%s\" %s\n",$4,$1,$2,$3,$5}')
+
+    log "stream_list: $stream_list"
+    chosen_stream=$(echo "$stream_list" | $MENU_CMD -l 10 -i -p "Streams: ") || return 1
+    chosen_stream=$(echo "$chosen_stream" | sed 's/(.*) * \([^ ]*\) : .*/\1/')
+    [ -z "$chosen_stream" ] && return 1
+    echo "$chosen_stream"
+}
+
+check_and_launch () {
+    local game_name="$1" game_id=$(get_game_info "$1") twitch_data= stream_list= stream=
+    log "Checking connected streams for $game_name ..."
+    twitch_data=$(curl_get "streams" "game_id=$game_id" t)
+    chosen_stream=$(choose_stream "$twitch_data") || aborted
+    echo "$chosen_stream" > "$LAST_STREAM_FILE"
+    launch_stream "$chosen_stream"
     exit
 }
 
@@ -190,29 +112,19 @@ twitchgamefunction () {
 }
 
 twitchlivefunction () {
-    local streamer=$1
+    streamer=$1 LOGROOT="$LOGROOT:live"
     if [ -n "$streamer" ]; then
-        echo "Checking if $streamer is live ..."
-        test=$(curl_get streams "user_login=$streamer" | jq '.data | length' t)
-        [ ! "$test" = 0 ] && (exec $CHAT_CMD "https://www.twitch.tv/popout/$streamer/chat?darkpopout" & mpv "https://www.twitch.tv/$streamer") || echo "$streamer doesn't stream right now"
-        exit
+        params="user_login=$streamer"
     else
-        echo "Checking connected streams ..."
-        userlogins=$(awk '{printf "user_login="$1"&"}' "$CHANNELS_FILE")
-        twitchdata=$(curl_get "streams" "$userlogins")
-
-        game_ids=$(echo "$twitchdata" | jq -r '.data[] | .game_id' | awk '{printf "id="$1"&"}')
-        curl_data=$(curl_get "games" "$game_ids")
-        game_dico=$(echo "$curl_data" | jq -r '.data[] | .id,.name' | awk 'NR%2{printf "%s ",$0;next;}1')
-
-        streams_test=$(echo "$twitchdata" | jq -r '.data[] | .user_name, .game_id')
-        [ -z "$streams_test" ] && aborted "Nothing found"
-        stream=$(echo "$streams_test" | while read a;do echo "$a" | grep -q "^[0-9]*$" && echo "$game_dico" | grep "$a" | sed 's/^[0-9]* //' || echo "$a";done | awk 'NR%2{printf "%14s : ",$0;next;}1' | $MENU_CMD -l 10 -i -p "Streams: ") || aborted
-        stream=$(echo "$stream" | sed 's/ *\([^ ]*\).*/\1/')
-        echo "https://www.twitch.tv/$stream"
-        exec $CHAT_CMD "https://www.twitch.tv/popout/$stream/chat?darkpopout" & mpv "https://www.twitch.tv/$stream"
-        exit
+        params=$(awk '{printf "user_login="$1"&"}' "$CHANNELS_FILE")
     fi
+
+    echo "Checking connected streams ..."
+
+    twitch_data=$(curl_get "streams" "$params")
+    chosen_stream=$(choose_stream "$twitch_data") || aborted
+    launch_stream "$chosen_stream"
+    exit
 }
 
 twitchvod_search() {
