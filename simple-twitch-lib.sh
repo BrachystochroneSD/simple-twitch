@@ -1,7 +1,13 @@
-APPNAME=twitch
+APPNAME=simple-twitch
 
-CONFIG_DIR="${HOME}/.config/twitch"
-CACHE_DIR="${HOME}/.cache/twitch"
+[ -n "$XDG_CONFIG_HOME" ] && CONFIG_HOME="$XDG_CONFIG_HOME" || CONFIG_HOME="${HOME}/.config"
+[ -n "$XDG_CACHE_HOME" ] && CACHE_HOME="$XDG_CACHE_HOME" || CACHE_HOME="${HOME}/.cache"
+
+CONFIG_DIR="$XDG_CONFIG_HOME/$APPNAME"
+CACHE_DIR="$XDG_CACHE_HOME/$APPNAME"
+
+mkdir -p "$CONFIG_DIR"
+mkdir -p "$CACHE_DIR"
 
 ACCESS_TOKEN_CACHE_FILE="${CACHE_DIR}/access_token"
 touch "$ACCESS_TOKEN_CACHE_FILE"
@@ -76,7 +82,6 @@ get_token(){
          --data "grant_type=client_credentials"
 }
 
-
 echoerror() {
     echo "$*"
     noshit="$*. Choose an other game:"
@@ -95,7 +100,6 @@ aborted() {
     [ -n "$1" ] && notify-send -a "$APPNAME" -i gnome-twitch -e "Error: $1"
     exit 1
 }
-
 
 refresh_access_token(){
     local token

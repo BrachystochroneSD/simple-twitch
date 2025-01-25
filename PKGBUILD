@@ -4,25 +4,26 @@ pkgver=0.3.0
 pkgrel=1
 pkgdesc="Simple script to access twitch simply"
 arch=(any)
-url="https://www.github.com/BrachystochroneSD/simple-twitch"
+url="https://www.github.com/BrachystochroneSD/${pkgname}"
 license=('GPL')
 depends=(jq sed gawk mpv curl)
 optdepends=()
-backup=(etc/twitch.conf)
+backup=(etc/${pkgname}.conf)
 source=(
-  twitch.desktop
-  twitch_lib.sh
-  twitch.sh
-  twitch.conf
+  ${pkgname}.desktop
+  ${pkgname}-lib.sh
+  ${pkgname}.sh
+  ${pkgname}.conf
 )
-sha256sums=('e1e600aef687525be7e4ad6e4abc0ab5099930569853a8ae572caaa208e57104'
-            '1741be607aaac4ccae8b030fffad9916183b0ef2a877845c26a168b4070b7086'
-            '05bf1819bc3e909bf582e79f66d497ffddb1b8195f2d3a92008d13df283bd7d1'
+sha256sums=('549dc0a782e806b7160f02eac53cf29e1ac308e4642a15227454d362d586eb82'
+            '641ddfaf1ea13477a7b7855a9efc329b82a4e0122a45f4a38c5893ec188e1cd1'
+            '3f1412637bc2deaa493c8f178d419fbf0aa9eb955be4240932f45bd92cc3fdb5'
             '6a30f61201159d53b23c2483135ed088e841f47fbbd95676bd23625d83dff529')
 
 package() {
-  install -Dm644 twitch_lib.sh "$pkgdir/usr/share/twitch/twitch_lib.sh"
+  install -Dm644 ${pkgname}.desktop "$pkgdir/usr/share/applications/${pkgname}.desktop"
+  install -Dm644 ${pkgname}-lib.sh "$pkgdir/usr/share/${pkgname}/${pkgname}-lib.sh"
 
-  install -Dm600 twitch.conf "$pkgdir/etc/twitch.conf"
-  install -Dm755 twitch.sh "$pkgdir/usr/bin/twitch"
+  install -Dm600 ${pkgname}.conf "$pkgdir/etc/${pkgname}.conf"
+  install -Dm755 ${pkgname}.sh "$pkgdir/usr/bin/${pkgname}"
 }

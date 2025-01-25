@@ -1,6 +1,6 @@
 #!/bin/sh
 
-CONFIG_FILE="/etc/twitch.conf"
+CONFIG_FILE="/etc/simple-twitch.conf"
 
 . "$CONFIG_FILE"
 
@@ -11,15 +11,7 @@ CONFIG_FILE="/etc/twitch.conf"
 [ -z "$CHAT_CMD" ] && CHAT_CMD="firefox --new-window"
 [ -z "$MAX_VID" ] && MAX_VID=100
 
-
-# Parameters
-
-LIB_DIR="/usr/lib/simple-twitch"
-
-# TODELETE
-LIB_DIR="."
-
-. "$LIB_DIR/twitch_lib.sh"
+. "/usr/share/simple-twitch/simple-twitch-lib.sh"
 
 TIME_FILE="$CACHE_DIR/vod_histo"
 TEMP_TIME=$(mktemp)

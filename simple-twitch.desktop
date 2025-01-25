@@ -1,0 +1,5 @@
+[Desktop Entry]
+Type=Application
+Name=simple-twitch
+Exec=simple-twitch --menu
+Icon=gnome-twitch
