@@ -15,27 +15,37 @@ TEMP_TIME=$(mktemp)
 
 CHANNELS_FILE="$CONFIG_DIR/listchanneltwitch"
 GAMES_FILE="$CONFIG_DIR/listgamestwitch"
-gamesdb="${HOME}/.config/gamedatabase/gamesdb"
+
+touch $GAMES_FILE
+touch $CHANNELS_FILE
 
 LOGROOT="$APPNAME:MENU"
 
-LAST_STREAM_FILE="$CONFIG_DIR/lastchannelviewed"
+LAST_GAME_FILE="$CACHE_DIR/last_game"
+LAST_STREAM_FILE="$CACHE_DIR/last_streamer"
 touch "$LAST_STREAM_FILE"
+touch "$LAST_GAME_FILE"
+
+OFFSET=0
+
+search_categories() {
+    query=$1
+    curl_data=$(curl_get "search/categories" "query=$1" t)
+    echo "$curl_data" | jq -r '.data[] | "\(.id);\(.name);\(.box_art_url)" '
+}
+
+search_channels() {
+    query=$1
+    curl_data=$(curl_get "search/channels" "query=$1" t)
+    echo "$curl_data" | jq -r '.data[] | "\(.id);\(.broadcaster_language);\(.display_name);\(.thumbnail_url)"'
+}
 
 get_user_id() {
     log "Get User ID"
     local user_id="$1" key1= key2= curl_data=
     echo "$input" | grep -q "^[0-9]+$" && { key1="id";key2="login"; } || { key1="login";key2="id"; }
     curl_data=$(curl_get "users" "$key1=$user_id" t)
-    echo $curl_data | jq -r ".data[] | .$key2"
-}
-
-get_game_info () {
-    log "Get Game info"
-    local gx="$1" key1= key2= curl_data=
-    echo "$input" | grep -q "^[0-9]+$" && { key1="id";key2="name"; } || { key1="name";key2="id"; }
-    curl_data=$(curl_get "games" "$key1=$gx" t)
-    echo $curl_data | jq -r ".data[] | .$key2"
+    echo "$curl_data" | jq -r ".data[] | .$key2"
 }
 
 launch_stream() {
@@ -72,7 +82,7 @@ choose_stream() {
 }
 
 check_and_launch () {
-    local game_name="$1" game_id=$(get_game_info "$1") twitch_data= stream_list= stream=
+    local game_name=$1 game_id=$2 twitch_data= stream_list= stream=
     log "Checking connected streams for $game_name ..."
     twitch_data=$(curl_get "streams" "game_id=$game_id" t)
     chosen_stream=$(choose_stream "$twitch_data") || aborted
@@ -81,28 +91,36 @@ check_and_launch () {
     exit
 }
 
-twitchgamefunction () {
-    game=$(echo "$(cat $GAMES_FILE)\n\nOther\nAdd Game" | $MENU_CMD -l 15 -i -p "$noshit") || aborted
-
-    case "$game" in
-        "Add Game")
-            local dprompt="Add game: "
-            game=$($MENU_CMD -l 10 -i -p "$dprompt" < "$gamesdb") || aborted
-            echo "$game" >> "$GAMES_FILE"
-
-            local dprompt="Do you want to check streams for $game? "
-            cert=$(printf "No\nYes" | $MENU_CMD -l 10 -i -p "$dprompt")
-            [ "$cert" = "Yes" ] || aborted
-            ;;
-        "Other")
-            game=$($MENU_CMD -l 10 -i -p "$noshit" < "$gamesdb") || aborted
-            check_and_launch "$game" ;;
-        *)
-            check_and_launch "$game" ;;
-    esac
+choose_from_list() {
+    list=$1 format=$2 prompt=$3 separator=$4 ensure=$5
+    length=$(echo "$list" | wc -l)
+    [  "$length" = 1 ] && echo "$list" && return 0
+    print_format=$(echo "$format" | sed 's/%/$/g')
+    chosen=$(echo "$list" | awk -F "$separator" "{print $print_format}" | $MENU_CMD -l 15 -i -p "$prompt") || return 1
+    if [ -z "$ensure" ]; then
+        echo "$chosen"
+    else
+        echo "$list" | grep -E "$separator?$chosen$separator?"
+    fi
 }
 
-twitchlivefunction() {
+twitch_game () {
+    game_list=$(cat "$GAMES_FILE")
+    query=$(choose_from_list "$game_list" "%2" "Search For Category: " ";") || aborted
+    game=$(cat "$GAMES_FILE" | grep ";$query;")
+    if [ -z "$game" ]; then
+        category_list=$(search_categories "$query")
+        [  -z "$category_list" ] && aborted "Nothing found for $query"
+        game=$(choose_from_list "$category_list" "%2" "Choose Game" ";" t) || aborted "Need existing category name"
+        echo "$game" > "$LAST_GAME_FILE"
+    fi
+    game_id=${game%%;*}
+    game_name=${game#*;}
+    game_name=${game_name%%;*}
+    check_and_launch "$game_name" "$game_id"
+}
+
+twitch_live() {
     streamer=$1 LOGROOT="$LOGROOT:live"
     if [ -n "$streamer" ]; then
         params="user_login=$streamer"
@@ -141,20 +159,20 @@ curl_choose_and_watch() {
     user_id=$(get_user_id "$searchingshit")
     [ -z "$user_id" ] && aborted "user id not found"
     twitchvod=$(curl_get "videos" "user_id=$user_id&first=$MAX_VID")
-    total_vod=$(echo $twitchvod | sed 's/\\n//g' | jq -r '.data | length')
+    total_vod=$(echo "$twitchvod" | jq -r '.data | length')
     [ "$total_vod" = "null" ] || [ "$total_vod" = 0 ] && twitchvod_search
 
     #create a table with all of the videos and get the url of the chosen one
     : $(( borne_max=total_vod - MAX_VID ))
-    video=$(echo $twitchvod | jq -r '.data[] | .title, .created_at' | awk -v bm=$borne_max -v offs="$offset" 'BEGIN{ if (offs > 0 ) { printf "Prev\n" } }!(NR%2){printf ("%3d: %-100s %.10s\n", FNR/2+offs, p, $0)}{p=$0}END{ if (offs < bm) { printf "Next" } }' | $MENU_CMD -i -l 30 -p "Which video: " | sed 's/:.*//')
+    video=$(echo "$twitchvod" | jq -r '.data[] | "\(.title) \(.created_at)"' | awk -v bm=$borne_max -v offs="$OFFSET" 'BEGIN{if (offs > 0){printf "Prev\n"}}{printf ("%3d: %-100s %.10s\n", FNR/2+offs, $1, $2)}END{ if (offs < bm) { printf "Next" } }' | $MENU_CMD -i -l 30 -p "Which video: " | sed 's/:.*//')
 
     if [ -z "$video" ];then
         twitchvod_search
     elif [ "$video" = "Next" ];then
-        : $(( offset=offset+100 ))
+        : $(( OFFSET=OFFSET+100 ))
         curl_choose_and_watch
     elif [ "$video" = "Prev" ];then
-        : $(( offset=offset-100 ))
+        : $(( OFFSET=OFFSET-100 ))
         curl_choose_and_watch
     else
         : $(( num=video-1-offset ))
@@ -196,45 +214,45 @@ _is_time_hhmmss() {
     echo "$1" | grep -q "[0-9][0-9]:[0-9][0-9]:[0-9][0-9]"
 }
 
+delete_game() {
+    game_to_delete=$(sort "$GAMES_FILE" | awk -F ";" "{print $2}" | $MENU_CMD -i -l 10 -p "Delete game: ")
+    grep -v ";$game_to_delete;" "$GAMES_FILE" > /tmp/gameshit && mv /tmp/gameshit "$GAMES_FILE"
+}
+
 delete_streamer() {
     streamer_to_delete=$(sort "$CHANNELS_FILE" | $MENU_CMD -i -l 10 -p "Delete streamer: ")
     grep -v "$streamer_to_delete" "$CHANNELS_FILE" > /tmp/chanshit && mv /tmp/chanshit "$CHANNELS_FILE"
 }
 
 twitchmenu() {
-    laststreamer=$(cat "$LAST_STREAM_FILE")
-    choice=$(printf "LIVE\nGAMES\nVOD\n\nAdd last streamer: $laststreamer\nDelete streamer" | $MENU_CMD -i -l 10 -p "Twitch Menu :")
+    last_streamer=$(cat "$LAST_STREAM_FILE")
+    last_game=$(cat "$LAST_GAME_FILE" | sed 's/[0-9]*;\([^;]*\);.*/\1/')
+    [ -n "$last_game" ] && lgopt="\nAdd Last Game: $last_game"
+    [ -n "$last_streamer" ] && lsopt="\nAdd Last Streamer: $last_streamer"
+    choice=$(printf "LIVE\nGAMES\nVOD\n$lsopt$lgopt\nDelete streamer\nDelete game" | $MENU_CMD -i -l 10 -p "Twitch Menu :")
 
     case "$choice" in
-        "LIVE")
-        twitchlivefunction "$2" ;;
-        "GAMES")
-            args=$(echo "$*" | sed "s/$1 *//")
-            noshit="Choose a game: "
-            [ -n "$args" ] && check_and_launch "$args"
-            twitchgamefunction ;;
-        "VOD")
-            offset=0
-            twitchvod_search ;;
-        "Add last streamer: $laststreamer") cat "$LAST_STREAM_FILE" >> "$CHANNELS_FILE" ;;
+        "LIVE") twitch_live ;;
+        "GAMES") twitch_game ;;
+        "VOD") twitchvod_search ;;
+        "Add Last Streamer:"*) echo "$last_streamer" >> "$CHANNELS_FILE" ;;
+        "Add Last Game:"*)
+            content="$(cat "$GAMES_FILE")"
+            printf "%s\n%s\n" "$content" "$(cat $LAST_GAME_FILE)" | sort -u > "$GAMES_FILE"
+            ;;
         "Delete streamer") delete_streamer ;;
-        *) aborted ;;
+        "Delete game") delete_game ;;
+        *) aborted "Option not found" ;;
     esac
 }
 
 check_internet
 
 case $1 in
-    --live) twitchlivefunction "$2" ;;
-    --game)
-        args=$(echo "$*" | sed "s/$1 *//")
-        noshit="Choose a game: "
-        [ -n "$args" ] && check_and_launch "$args"
-        twitchgamefunction ;;
-    --vod)
-        offset=0
-        twitchvod_search ;;
+    --live) twitch_live "$2" ;;
+    --game) twitch_game ;;
+    --vod) twitchvod_search ;;
     --refresh-token) refresh_access_token ;;
-    --help) echo "usage: twitchscript --live (stream name), --vod, --game (game) or --refresh-token" ;;
+    --help) echo "usage: twitchscript --live (stream name), --vod, --game or --refresh-token" ;;
     *) twitchmenu ;;
 esac
