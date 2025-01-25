@@ -1,26 +1,25 @@
 #!/bin/sh
 
+. "/usr/share/simple-twitch/simple-twitch-lib.sh"
+
 CONFIG_FILE="/etc/simple-twitch.conf"
 
 . "$CONFIG_FILE"
-
-[ -z "$TWITCH_CLIENTID" ] && echo "TWITCH_CLIENTID" && exit 1
-[ -z "$TWITCH_SECRET" ] && echo "TWITCH_SECRET needed" && exit 1
 
 [ -z "$MENU_CMD" ] && MENU_CMD="dmenu"
 [ -z "$CHAT_CMD" ] && CHAT_CMD="firefox --new-window"
 [ -z "$MAX_VID" ] && MAX_VID=100
 
-. "/usr/share/simple-twitch/simple-twitch-lib.sh"
-
 TIME_FILE="$CACHE_DIR/vod_histo"
 TEMP_TIME=$(mktemp)
 
-[ -z "$MAX_VID" ] &&
+CHANNELS_FILE="$CONFIG_DIR/listchanneltwitch"
+GAMES_FILE="$CONFIG_DIR/listgamestwitch"
+gamesdb="${HOME}/.config/gamedatabase/gamesdb"
 
-mkdir -p $CONFIG_DIR
-mkdir -p $CACHE_DIR
+LOGROOT="$APPNAME:MENU"
 
+LAST_STREAM_FILE="$CONFIG_DIR/lastchannelviewed"
 touch "$LAST_STREAM_FILE"
 
 get_user_id() {
@@ -103,7 +102,7 @@ twitchgamefunction () {
     esac
 }
 
-twitchlivefunction () {
+twitchlivefunction() {
     streamer=$1 LOGROOT="$LOGROOT:live"
     if [ -n "$streamer" ]; then
         params="user_login=$streamer"

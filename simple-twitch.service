@@ -1,0 +1,11 @@
+[Unit]
+Description=Check twitch streams and notify if any new is live
+After=network.target
+Wants=simple-twitch.timer
+
+[Service]
+Type=oneshot
+ExecStart=sh /var/lib/simple-twitch/twitch-stream-notif.sh
+
+[Install]
+WantedBy=multi-user.target

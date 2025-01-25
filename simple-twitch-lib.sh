@@ -1,5 +1,12 @@
 APPNAME=simple-twitch
 
+CONFIG_FILE="/etc/simple-twitch.conf"
+
+. "$CONFIG_FILE"
+
+[ -z "$TWITCH_CLIENTID" ] && echo "TWITCH_CLIENTID" && exit 1
+[ -z "$TWITCH_SECRET" ] && echo "TWITCH_SECRET needed" && exit 1
+
 [ -n "$XDG_CONFIG_HOME" ] && CONFIG_HOME="$XDG_CONFIG_HOME" || CONFIG_HOME="${HOME}/.config"
 [ -n "$XDG_CACHE_HOME" ] && CACHE_HOME="$XDG_CACHE_HOME" || CACHE_HOME="${HOME}/.cache"
 
@@ -13,16 +20,7 @@ ACCESS_TOKEN_CACHE_FILE="${CACHE_DIR}/access_token"
 touch "$ACCESS_TOKEN_CACHE_FILE"
 TWITCH_ACCESS_TOKEN=$(cat "$ACCESS_TOKEN_CACHE_FILE")
 
-CHANNELS_FILE="$CONFIG_DIR/listchanneltwitch"
-LAST_STREAM_FILE="$CONFIG_DIR/lastchannelviewed"
-GAMES_FILE="$CONFIG_DIR/listgamestwitch"
-
-gamesdb="${HOME}/.config/gamedatabase/gamesdb"
-
 API="https://api.twitch.tv/helix"
-
-LOGROOT="$APPNAME"
-
 
 check_internet() {
     if ! ping -q -c 1 -W 1 1.1.1.1 >/dev/null 2>&1; then
@@ -55,6 +53,7 @@ curl_call() {
          -H "Authorization: Bearer $TWITCH_ACCESS_TOKEN" \
          -H "Accept: application/json" \
          -G "$API/$endpoint" \
+         -D "$CACHE_DIR/curl_headers" \
          $opt "$data"
 }
 
@@ -66,6 +65,7 @@ curl_get() {
     log "opt: $opt"
     curl_output=$(curl_call "$opt" "$data" "$endpoint")
     log "CURL OUTPUT: $curl_output" 3
+    log "CURL HEADER: $(cat $CACHE_DIR/curl_headers)" 3
     handle_error "$curl_output"
     if [ $? -eq 2 ]; then
         log "Token refresh done, retry call"
@@ -96,8 +96,14 @@ log() {
     fi
 }
 
+notif() {
+    msg=$1 transient=$2
+    [ -n "$transient" ] && opt="-e"
+    notify-send "$msg" -a "$APPNAME" -i gnome-twitch "$opt"
+}
+
 aborted() {
-    [ -n "$1" ] && notify-send -a "$APPNAME" -i gnome-twitch -e "Error: $1"
+    [ -n "$1" ] && notif "Error: $1" 1
     exit 1
 }
 

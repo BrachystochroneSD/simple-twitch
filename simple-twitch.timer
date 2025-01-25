@@ -1,0 +1,10 @@
+[Unit]
+Description=Launch stream notify each 5 minutes
+Requires=simple-twitch.service
+
+[Timer]
+OnUnitActiveSec=5min
+Unit=simple-twitch.service
+
+[Install]
+WantedBy=timers.target
