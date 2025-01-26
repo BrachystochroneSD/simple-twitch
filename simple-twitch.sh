@@ -15,6 +15,7 @@ TEMP_TIME=$(mktemp)
 
 mkdir -p "$CACHE_DIR/thumbnails/games"
 
+CACHE_CHANNEL_LIVE="$CACHE_DIR/channel_live"
 CHANNELS_FILE="$CONFIG_DIR/listchanneltwitch"
 GAMES_FILE="$CONFIG_DIR/listgamestwitch"
 
@@ -241,15 +242,35 @@ delete_streamer() {
     grep -v "$streamer_to_delete" "$CHANNELS_FILE" > /tmp/chanshit && mv /tmp/chanshit "$CHANNELS_FILE"
 }
 
+__get_file_content() {
+    file=$1 content=
+    [ ! -f "$file" ] && return 1
+    content=$(cat "$file")
+    [ -n "$content" ] && echo "$content"
+}
+
+__file_exist_and_not_empty() {
+    file=$1
+    [ -f "$file" ] && [ -n "$(cat $file)" ]
+}
+
 twitchmenu() {
-    last_streamer=$(cat "$LAST_STREAM_FILE")
-    [ -n "$last_streamer" ] && lsopt="\nAdd Last Streamer: $last_streamer"
-    choice=$(printf "LIVE\nGAMES\nVOD\n$lsopt$lgopt\nDelete streamer\nDelete game" | $MENU_CMD -i -l 10 -p "Twitch Menu :") || aborted
+    choice=$({
+                live_streams=$(cat "$CACHE_CHANNEL_LIVE" | tr -d "\n")
+                [ -n "$live_streams" ] && echo "LIVE NOW: $live_streams"
+                echo "Search Games"
+                echo "Channel VODs"
+                echo
+                __file_exist_and_not_empty "$LAST_STREAM_FILE"
+                last_streamer=$(__get_file_content "$LAST_STREAM_FILE") && echo "Add Last Streamer: $last_streamer"
+                __file_exist_and_not_empty "$CHANNELS_FILE" && echo "Delete streamer"
+                __file_exist_and_not_empty "$GAMES_FILE" && echo "Delete streamer"
+            } | $MENU_CMD -i -l 10 -p "Twitch Menu :") || aborted
 
     case "$choice" in
-        "LIVE") twitch_live ;;
-        "GAMES") twitch_game ;;
-        "VOD") twitchvod_search ;;
+        "Live Now:"*) twitch_live ;;
+        "Search Games") twitch_game ;;
+        "Channel VODs") twitchvod_search ;;
         "Add Last Streamer:"*) echo "$last_streamer" >> "$CHANNELS_FILE" ;;
         "Delete streamer") delete_streamer ;;
         "Delete game") delete_game ;;
