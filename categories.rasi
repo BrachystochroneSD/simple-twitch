@@ -1,0 +1,98 @@
+// Config //
+configuration {
+    modi:                        "drun";
+    show-icons:                  true;
+    drun-display-format:         "{name}";
+    font:                        "JetBrainsMono Nerd Font 10";
+}
+
+* {
+    main-fg:            #cdd6f4ff;
+    main-ex:            #f5e0dcff;
+    select-bg:          #28282855;
+    select-fg:          #ffffffff;
+    separatorcolor:     transparent;
+    border-color:       transparent;
+    background: #FFFFFF00;
+}
+
+
+// Main //
+window {
+    enabled:                     true;
+    fullscreen:                  false;
+    width:                       80%;
+    transparency:                "real";
+    cursor:                      "default";
+    spacing:                     0em;
+    padding:                     0em;
+    border:                      0em;
+    border-radius:               0em;
+    border-color:                transparent;
+    background-color:            transparent;
+}
+mainbox {
+    enabled:                     true;
+    orientation:                 horizontal;
+    children:                    [ "dummy", "frame", "dummy" ];
+    background-color:            transparent;
+}
+frame {
+    children:                    [ "listview" ];
+    background-color:            transparent;
+}
+
+
+// Lists //
+listview {
+    enabled:                     true;
+    spacing:                     5em;
+    padding:                     4em;
+    columns:                     4;
+    lines:                       1;
+    dynamic:                     false;
+    fixed-height:                false;
+    fixed-columns:               true;
+    reverse:                     true;
+    cursor:                      "default";
+    background-color:            transparent;
+    text-color:                  @main-fg;
+}
+dummy {
+    width:                       2em;
+    expand:                      false;
+    background-color:            transparent;
+}
+
+
+// Elements //
+element {
+    enabled:                     true;
+    border-radius: 10px;
+    orientation: vertical;
+    spacing:                     0em;
+    padding:                     0em;
+    cursor:                      pointer;
+    background-color:            transparent;
+    text-color:                  @main-fg;
+}
+element selected.normal {
+    background-color:            @select-bg;
+    text-color:                  @select-fg;
+}
+element-icon {
+    cursor:                      inherit;
+    size:                        28em;
+    border-radius: 0;
+    background-color:            transparent;
+    text-color:                  inherit;
+    expand:                      false;
+}
+element-text {
+    vertical-align:              0.5;
+    horizontal-align:            0.5;
+    padding: 1em;
+    cursor:                      inherit;
+    background-color:            transparent;
+    text-color:                  inherit;
+}

@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/usr/bin/env bash
 
 . "/usr/share/simple-twitch/simple-twitch-lib.sh"
 
@@ -12,6 +12,8 @@ CONFIG_FILE="/etc/simple-twitch.conf"
 
 TIME_FILE="$CACHE_DIR/vod_histo"
 TEMP_TIME=$(mktemp)
+
+mkdir -p "$CACHE_DIR/thumbnails/games"
 
 CHANNELS_FILE="$CONFIG_DIR/listchanneltwitch"
 GAMES_FILE="$CONFIG_DIR/listgamestwitch"
@@ -105,6 +107,13 @@ choose_from_list() {
 
 twitch_game () {
     game_list=$(cat "$GAMES_FILE")
+    IFS=";"
+    echo "$game_list" | while read game_id game_name image_url; do
+        if [  ! -f "$CACHE_DIR/thumbnails/games/$game_id" ]; then
+            curl $image_url > "$CACHE_DIR/thumbnails/games/$game_id"
+        fi
+        printf "%s\x00icon\x1f%s\n" "$game_name" "$CACHE_DIR/thumbnails/games/$game_id"
+    done | rofi -dmenu -i -p "Search Category: " -config categories.rasi
     query=$(choose_from_list "$game_list" "%2" "Search For Category: " ";") || aborted
     game=$(cat "$GAMES_FILE" | grep ";$query;")
     if [ -z "$game" ]; then

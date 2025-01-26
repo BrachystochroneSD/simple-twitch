@@ -1,0 +1,49 @@
+configuration {
+    modi: "dmenu";
+    show-icons: true;
+    font: "Fira Code 14";  /* Change la police et la taille si nécessaire */
+    lines: 6;  /* Nombre de lignes visibles */
+    columns: 4;  /* Nombre de colonnes visibles (pour faire une grille 4x2) */
+}
+
+window {
+    width: 70%;  /* Largeur de la fenêtre */
+    height: 40%;  /* Hauteur de la fenêtre */
+    border-radius: 10px;  /* Coins arrondis */
+    padding: 5px;
+    location: center;  /* Centrer la fenêtre */
+}
+
+listview {
+    lines: 6;  /* Nombre de lignes visibles */
+    columns: 4;  /* Nombre de colonnes visibles */
+    fixed-height: true;
+    dynamic-width: false;
+}
+
+element {
+    border-radius: 8px;  /* Coins arrondis pour chaque élément */
+    border: 2px solid #444444;  /* Bordure fine */
+    padding: 15px;
+    margin: 5px;
+    background-color: #222222;  /* Fond sombre pour les éléments */
+    text-color: #ffffff;  /* Texte en blanc */
+    highlight-background-color: #555555;  /* Fond des éléments survolés */
+    highlight-text-color: #ffffff;  /* Texte des éléments survolés */
+}
+
+element selected {
+    background-color: #888888;  /* Fond sélectionné */
+}
+
+listview > element:checked {
+    background-color: #007ACC;  /* Couleur de fond quand un élément est sélectionné */
+    text-color: #ffffff;  /* Texte sélectionné */
+}
+
+separator {
+    width: 100%;
+    height: 1px;
+    background-color: #333333;
+    margin: 2px;
+}
