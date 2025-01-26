@@ -111,7 +111,8 @@ twitch_game () {
     IFS=";"
     echo "$game_list" | while read game_id game_name image_url; do
         if [  ! -f "$CACHE_DIR/thumbnails/games/$game_id" ]; then
-            curl $image_url > "$CACHE_DIR/thumbnails/games/$game_id"
+            image_url=$(echo "$image_url" | sed 's/[0-9]*x[0-9]*\.jpg$/260x360.jpg/')
+            curl "$image_url" > "$CACHE_DIR/thumbnails/games/$game_id"
         fi
         printf "%s\x00icon\x1f%s\n" "$game_name" "$CACHE_DIR/thumbnails/games/$game_id"
     done | rofi -dmenu -i -p "Search Category: " -config categories.rasi
@@ -256,8 +257,8 @@ __file_exist_and_not_empty() {
 
 twitchmenu() {
     choice=$({
-                live_streams=$(cat "$CACHE_CHANNEL_LIVE" | tr -d "\n")
-                [ -n "$live_streams" ] && echo "LIVE NOW: $live_streams"
+                live_streams=$(cat "$CACHE_CHANNEL_LIVE" | tr "\n" " ")
+                [ -n "$live_streams" ] && echo "Live Now: $live_streams"
                 echo "Search Games"
                 echo "Channel VODs"
                 echo

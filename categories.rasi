@@ -1,4 +1,3 @@
-// Config //
 configuration {
     modi:                        "drun";
     show-icons:                  true;
@@ -7,91 +6,111 @@ configuration {
 }
 
 * {
-    main-fg:            #cdd6f4ff;
-    main-ex:            #f5e0dcff;
-    select-bg:          #28282855;
-    select-fg:          #ffffffff;
-    separatorcolor:     transparent;
-    border-color:       transparent;
-    background: #FFFFFF00;
+    bg:           #28282844;
+    hard-bg:      #1d202144;
+    bright-bg:    #92837444;
+    fg:           #a89984;
+    bright-fg:    #ebdbb2;
 }
 
 
-// Main //
 window {
     enabled:                     true;
     fullscreen:                  false;
-    width:                       80%;
+    width:                       70%;
     transparency:                "real";
     cursor:                      "default";
     spacing:                     0em;
     padding:                     0em;
     border:                      0em;
     border-radius:               0em;
-    border-color:                transparent;
     background-color:            transparent;
 }
+
 mainbox {
     enabled:                     true;
-    orientation:                 horizontal;
-    children:                    [ "dummy", "frame", "dummy" ];
-    background-color:            transparent;
+    children:                    [ "inputbar", "frame" ];
 }
+
 frame {
+    orientation:                 horizontal;
     children:                    [ "listview" ];
-    background-color:            transparent;
 }
 
+inputbar {
+    background-color:            @bg;
+    padding:   10px;
+    border-radius: 10px;
+    text-color:                  @fg;
+    children: ["prompt", "entry"];
+}
 
-// Lists //
+prompt {
+   text-color: @fg;
+}
+
+entry {
+      text-color: @bright-fg;
+}
+
 listview {
     enabled:                     true;
-    spacing:                     5em;
-    padding:                     4em;
-    columns:                     4;
+    border:                      0;
+    spacing:                     4em;
+    padding:                     1em;
+    columns:                     5;
     lines:                       1;
     dynamic:                     false;
     fixed-height:                false;
-    fixed-columns:               true;
-    reverse:                     true;
+    fixed-columns:               false;
+    reverse:                     false;
     cursor:                      "default";
-    background-color:            transparent;
-    text-color:                  @main-fg;
-}
-dummy {
-    width:                       2em;
-    expand:                      false;
-    background-color:            transparent;
 }
 
+scrollbar {
+   background-color: transparent;
+   handle-color:     @bright-bg;
+}
 
 // Elements //
 element {
     enabled:                     true;
-    border-radius: 10px;
-    orientation: vertical;
+    border-radius:               10px;
+    orientation:                 vertical;
     spacing:                     0em;
     padding:                     0em;
     cursor:                      pointer;
-    background-color:            transparent;
-    text-color:                  @main-fg;
+    background-color:            @bg;
 }
-element selected.normal {
-    background-color:            @select-bg;
-    text-color:                  @select-fg;
+
+element normal normal {
+    background-color:            @bg;
+    text-color:                  @fg;
 }
+
+element alternate normal {
+    background-color:            @bg;
+    text-color:                  @fg;
+}
+
+element selected normal {
+    background-color:            @bright-bg;
+    text-color:                  @bright-fg;
+}
+
 element-icon {
     cursor:                      inherit;
-    size:                        28em;
-    border-radius: 0;
+    size:                        11em;
+    border-radius:               0;
     background-color:            transparent;
     text-color:                  inherit;
     expand:                      false;
 }
+
 element-text {
     vertical-align:              0.5;
     horizontal-align:            0.5;
-    padding: 1em;
+    padding:                     1em;
     cursor:                      inherit;
     background-color:            transparent;
     text-color:                  inherit;
