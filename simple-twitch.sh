@@ -21,10 +21,8 @@ touch $CHANNELS_FILE
 
 LOGROOT="$APPNAME:MENU"
 
-LAST_GAME_FILE="$CACHE_DIR/last_game"
 LAST_STREAM_FILE="$CACHE_DIR/last_streamer"
 touch "$LAST_STREAM_FILE"
-touch "$LAST_GAME_FILE"
 
 OFFSET=0
 
@@ -92,15 +90,16 @@ check_and_launch () {
 }
 
 choose_from_list() {
+    # Unique ID should always be at first col in list
     list=$1 format=$2 prompt=$3 separator=$4 ensure=$5
     length=$(echo "$list" | wc -l)
-    [  "$length" = 1 ] && echo "$list" && return 0
+    [  "$length" = 1 ] && [ -n "$ensure" ] && echo "$list" && return 0
     print_format=$(echo "$format" | sed 's/%/$/g')
     chosen=$(echo "$list" | awk -F "$separator" "{print $print_format}" | $MENU_CMD -l 15 -i -p "$prompt") || return 1
     if [ -z "$ensure" ]; then
         echo "$chosen"
     else
-        echo "$list" | grep -E "$separator?$chosen$separator?"
+        echo "$list" | grep -E "$separator$chosen$separator"
     fi
 }
 
@@ -112,7 +111,13 @@ twitch_game () {
         category_list=$(search_categories "$query")
         [  -z "$category_list" ] && aborted "Nothing found for $query"
         game=$(choose_from_list "$category_list" "%2" "Choose Game" ";" t) || aborted "Need existing category name"
-        echo "$game" > "$LAST_GAME_FILE"
+        if ! __is_in_file "$game" "$GAMES_FILE"; then
+            game_name=${game#*;}
+            game_name=${game_name%%;*}
+            if __confirm "Add $game_name to fav?"; then
+                echo "$game" >> "$GAMES_FILE"
+            fi
+        fi
     fi
     game_id=${game%%;*}
     game_name=${game#*;}
@@ -148,9 +153,13 @@ __is_in_file() {
 }
 
 __confirm() {
-    local prompt=$1 check
-    check=$(echo | $MENU_CMD -i -p "$prompt (Y/n)")
-    [ "$check" = "Y" ] || [ "$check" = "y" ] || [ -z "$check" ]
+    local prompt=$1 default_ok=$2 check
+    [ -n "$default_ok" ] && opts="(Y/n)" || opts="(y/N)"
+    check=$(echo | $MENU_CMD -i -p "$prompt $opts") || return 1
+    [ "$check" = "Y" ] && return 0
+    [ "$check" = "y" ] && return 0
+    [ -n "$default_ok" ] && [ -z "$check" ] && return 0
+    return 1
 }
 
 curl_choose_and_watch() {
@@ -178,12 +187,10 @@ curl_choose_and_watch() {
         : $(( num=video-1-offset ))
         videourl=$(echo $twitchvod | jq -r '.data['$num'].url')
         video_id=${videourl##*/}
-        echo "$videourl" | xclip -selection clipboard
-        echo selection cliped
         # ask for the resolution and launch the video with mpv
         if start_opt=$(grep "^$video_id" "$TIME_FILE");then
             start_opt=${start_opt#* }
-            __confirm "Start at $start_opt ?" && {
+            __confirm "Start at $start_opt ?" 1 && {
                 start_opt="--start=$start_opt"
             } || start_opt=
         fi
@@ -207,7 +214,7 @@ _save_time_on_file() {
     local video_id=$1 time=$2 file=$3 content
     content=$(grep -v "^$video_id" "$file")
     log "Saving '$video_id' '$time' on '$file'"
-    echo "$content\n$video_id $time" > $file
+    printf "%s\n%s %s" "$content" "$video_id" "$time" > $file
 }
 
 _is_time_hhmmss() {
@@ -215,8 +222,9 @@ _is_time_hhmmss() {
 }
 
 delete_game() {
-    game_to_delete=$(sort "$GAMES_FILE" | awk -F ";" "{print $2}" | $MENU_CMD -i -l 10 -p "Delete game: ")
-    grep -v ";$game_to_delete;" "$GAMES_FILE" > /tmp/gameshit && mv /tmp/gameshit "$GAMES_FILE"
+    game_id=$(choose_from_list "$(sort "$GAMES_FILE")" "%2" "Delete game: " ";" t | sed 's/;.*//')
+    sed -i "/^$game_id/d" "$GAMES_FILE"
+    notif "Game deleted" t
 }
 
 delete_streamer() {
@@ -226,20 +234,14 @@ delete_streamer() {
 
 twitchmenu() {
     last_streamer=$(cat "$LAST_STREAM_FILE")
-    last_game=$(cat "$LAST_GAME_FILE" | sed 's/[0-9]*;\([^;]*\);.*/\1/')
-    [ -n "$last_game" ] && lgopt="\nAdd Last Game: $last_game"
     [ -n "$last_streamer" ] && lsopt="\nAdd Last Streamer: $last_streamer"
-    choice=$(printf "LIVE\nGAMES\nVOD\n$lsopt$lgopt\nDelete streamer\nDelete game" | $MENU_CMD -i -l 10 -p "Twitch Menu :")
+    choice=$(printf "LIVE\nGAMES\nVOD\n$lsopt$lgopt\nDelete streamer\nDelete game" | $MENU_CMD -i -l 10 -p "Twitch Menu :") || aborted
 
     case "$choice" in
         "LIVE") twitch_live ;;
         "GAMES") twitch_game ;;
         "VOD") twitchvod_search ;;
         "Add Last Streamer:"*) echo "$last_streamer" >> "$CHANNELS_FILE" ;;
-        "Add Last Game:"*)
-            content="$(cat "$GAMES_FILE")"
-            printf "%s\n%s\n" "$content" "$(cat $LAST_GAME_FILE)" | sort -u > "$GAMES_FILE"
-            ;;
         "Delete streamer") delete_streamer ;;
         "Delete game") delete_game ;;
         *) aborted "Option not found" ;;
