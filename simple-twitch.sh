@@ -179,12 +179,13 @@ curl_choose_and_watch() {
     user_id=$(get_user_id "$searchingshit")
     [ -z "$user_id" ] && aborted "user id not found"
     twitchvod=$(curl_get "videos" "user_id=$user_id&first=$MAX_VID")
-    total_vod=$(echo "$twitchvod" | jq -r '.data | length')
+    total_vod=$(echo $twitchvod | sed 's/\\n//g' | jq -r '.data | length')
     [ "$total_vod" = "null" ] || [ "$total_vod" = 0 ] && twitchvod_search
 
     #create a table with all of the videos and get the url of the chosen one
     : $(( borne_max=total_vod - MAX_VID ))
-    video=$(echo "$twitchvod" | jq -r '.data[] | "\(.title) \(.created_at)"' | awk -v bm=$borne_max -v offs="$OFFSET" 'BEGIN{if (offs > 0){printf "Prev\n"}}{printf ("%3d: %-100s %.10s\n", FNR/2+offs, $1, $2)}END{ if (offs < bm) { printf "Next" } }' | $MENU_CMD -i -l 30 -p "Which video: " | sed 's/:.*//')
+
+    video=$(echo $twitchvod | jq -r '.data[] | .title, .created_at' | awk -v bm=$borne_max -v offs="$offset" 'BEGIN{ if (offs > 0 ) { printf "Prev\n" } }!               (NR%2){printf ("%3d: %-100s %.10s\n", FNR/2+offs, p, $0)}{p=$0}END{ if (offs < bm) { printf "Next" } }' | $MENU_CMD -i -l 30 -p "Which video: " | sed 's/:.*//')
 
     if [ -z "$video" ];then
         twitchvod_search

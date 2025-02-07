@@ -1,6 +1,6 @@
 # Maintainer:  <samueld@mailo.com>
 pkgname=simple-twitch
-pkgver=0.5.0
+pkgver=0.5.1
 pkgrel=1
 pkgdesc="Simple script to access twitch simply"
 arch=(any)
@@ -23,7 +23,7 @@ sha256sums=('e50927dd0b4ced490da67d178dd5db7aae3fad9ff0372f4a119836be65487116'
             'c3e1e6e061733a1fb4be595ecd64001ad4187b8dcf617cb158d6aea047bd41d2'
             '549dc0a782e806b7160f02eac53cf29e1ac308e4642a15227454d362d586eb82'
             '2eb4e107c6f94c92658ad44c64ccb5fe24625139ca01970408af013a988be509'
-            '69751efe469b57469e47a5d5ab51c0de1d37d419c9c1ca9ee1402c5f371edbe1'
+            '41d8e0ffeedb2378f7f613fcdc4a74983d585b15bdef2d146afdbf43300d99e5'
             '6a30f61201159d53b23c2483135ed088e841f47fbbd95676bd23625d83dff529')
 
 package() {
