@@ -48,9 +48,12 @@ get_user_id() {
 }
 
 launch_stream() {
-    stream=$1
-    echo "Launching Stream $stream"
-    exec $CHAT_CMD "https://www.twitch.tv/popout/$stream/chat?darkpopout" & mpv "https://www.twitch.tv/$(echo $stream | tr [A-Z] [a-z])"
+    chosen_stream=$1
+    stream=${chosen_stream%%;*}
+    title=${chosen_stream#*;}
+    echo "Launching Stream $stream with title '$title'"
+    exec $CHAT_CMD "https://www.twitch.tv/popout/$stream/chat?darkpopout" &
+    mpv --title="${stream}:$title" "https://www.twitch.tv/$(echo $stream | tr [A-Z] [a-z])"
 }
 
 choose_stream() {
@@ -60,7 +63,9 @@ choose_stream() {
     length=$(echo "$twitch_data" | jq -r '.data | length')
     [ "$length" = 0 ] && aborted "Nothing found"
 
-    streams=$(echo "$twitch_data" | jq -r '.data[] | "\(.user_name);\(.game_name);\(.title);\(.language);\(.viewer_count)"') || aborted "Problem during parsing of jq data"
+    if ! streams=$(echo "$twitch_data" | jq -r '.data[] | "\(.user_name);\(.game_name);\(.title);\(.language);\(.viewer_count)"'); then
+        aborted "Problem during parsing of jq data"
+    fi
 
     log "streams: $streams"
     log "length: $length"
@@ -75,7 +80,8 @@ choose_stream() {
 
     log "stream_list: $stream_list"
     chosen_stream=$(echo "$stream_list" | $MENU_CMD -l 10 -i -p "Streams: ") || return 1
-    chosen_stream=$(echo "$chosen_stream" | sed 's/(.*) * \([^ ]*\) : .*/\1/')
+    log "chosen stream: $chosen_stream"
+    chosen_stream=$(echo "$chosen_stream" | sed 's/(.*) * \([^ ]*\) : [^"]* "\([^"]*\)".*/\1;\2/')
     [ -z "$chosen_stream" ] && return 1
     echo "$chosen_stream"
 }
