@@ -137,7 +137,7 @@ twitch_live() {
     if [ -n "$streamer" ]; then
         params="user_login=$streamer"
     else
-        params=$(awk '{printf "user_login="$1"&"}' "$CHANNELS_FILE")
+        params=$(get_cleaned_channel_file | awk '{printf "user_login="$1"&"}')
     fi
 
     echo "Checking connected streams ..."
@@ -264,6 +264,19 @@ get_menu() {
     __file_exist_and_not_empty "$GAMES_FILE" && echo "Delete game"
 }
 
+get_cleaned_channel_file() {
+    sed 's/ *#.*//;/^\s*$/d' "$CHANNELS_FILE"
+}
+
+add_last_channel() {
+    last_streamer=$(__get_file_content "$LAST_STREAM_FILE")
+    if get_cleaned_channel_file | grep -q "^$last_streamer\$"; then
+        aborted "Channel already saved"
+    else
+        echo "$last_streamer" >> "$CHANNELS_FILE"
+    fi
+}
+
 
 twitchmenu() {
     choice=$(get_menu | $MENU_CMD -i -l 10 -p "Twitch Menu :") || aborted
@@ -272,7 +285,7 @@ twitchmenu() {
         "Live Now:"*) twitch_live ;;
         "Search Games") twitch_game ;;
         "Channel VODs") twitchvod_search ;;
-        "Add Last Streamer:"*) __get_file_content "$LAST_STREAM_FILE" >> "$CHANNELS_FILE" ;;
+        "Add Last Streamer:"*) add_last_channel ;;
         "Delete streamer") delete_streamer ;;
         "Delete game") delete_game ;;
         *) aborted "Option not found" ;;
