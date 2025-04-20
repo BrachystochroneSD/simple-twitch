@@ -91,7 +91,7 @@ check_and_launch () {
     log "Checking connected streams for $game_name ..."
     twitch_data=$(curl_get "streams" "game_id=$game_id" t)
     chosen_stream=$(choose_stream "$twitch_data") || aborted
-    echo "$chosen_stream" > "$LAST_STREAM_FILE"
+    echo "${chosen_stream%%;*}" > "$LAST_STREAM_FILE"
     launch_stream "$chosen_stream"
     exit
 }
