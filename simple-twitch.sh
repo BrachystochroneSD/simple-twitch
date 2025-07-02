@@ -30,13 +30,13 @@ OFFSET=0
 search_categories() {
     query=$1
     curl_data=$(curl_get "search/categories" "query=$1" t)
-    echo "$curl_data" | jq -r '.data[] | "\(.id);\(.name);\(.box_art_url)" '
+    jculr "$curl_data" '.data[] | "\(.id);\(.name);\(.box_art_url)" '
 }
 
 search_channels() {
     query=$1
     curl_data=$(curl_get "search/channels" "query=$1" t)
-    echo "$curl_data" | jq -r '.data[] | "\(.id);\(.broadcaster_language);\(.display_name);\(.thumbnail_url)"'
+    jculr "$curl_data" '.data[] | "\(.id);\(.broadcaster_language);\(.display_name);\(.thumbnail_url)"'
 }
 
 get_user_id() {
@@ -44,7 +44,7 @@ get_user_id() {
     local user_id="$1" key1= key2= curl_data=
     echo "$input" | grep -q "^[0-9]+$" && { key1="id";key2="login"; } || { key1="login";key2="id"; }
     curl_data=$(curl_get "users" "$key1=$user_id" t)
-    echo "$curl_data" | jq -r ".data[] | .$key2"
+    jculr "$curl_data" ".data[] | .$key2"
 }
 
 launch_stream() {
@@ -60,10 +60,10 @@ choose_stream() {
     twitch_data=$1 auto_launch=$2
 
     log "twitch_data: $1" 2
-    length=$(echo "$twitch_data" | jq -r '.data | length')
+    length=$(jculr "$twitch_data" '.data | length')
     [ "$length" = 0 ] && aborted "Nothing found"
 
-    if ! streams=$(echo "$twitch_data" | jq -r '.data[] | "\(.user_name);\(.game_name);\(.title);\(.language);\(.viewer_count)"'); then
+    if ! streams=$(jculr "$twitch_data" '.data[] | "\(.user_name);\(.game_name);\(.title);\(.language);\(.viewer_count)"'); then
         aborted "Problem during parsing of jq data"
     fi
 
@@ -175,13 +175,13 @@ curl_choose_and_watch() {
     user_id=$(get_user_id "$searchingshit")
     [ -z "$user_id" ] && aborted "user id not found"
     twitchvod=$(curl_get "videos" "user_id=$user_id&first=$MAX_VID")
-    total_vod=$(echo $twitchvod | sed 's/\\n//g' | jq -r '.data | length')
+    total_vod=$(jculr "$twitchvod" '.data | length')
     [ "$total_vod" = "null" ] || [ "$total_vod" = 0 ] && twitchvod_search
 
     #create a table with all of the videos and get the url of the chosen one
     : $(( borne_max=total_vod - MAX_VID ))
 
-    video=$(echo $twitchvod | jq -r '.data[] | .title, .created_at' | awk -v bm=$borne_max -v offs="$offset" 'BEGIN{ if (offs > 0 ) { printf "Prev\n" } }!               (NR%2){printf ("%3d: %-100s %.10s\n", FNR/2+offs, p, $0)}{p=$0}END{ if (offs < bm) { printf "Next" } }' | $MENU_CMD -i -l 30 -p "Which video: " | sed 's/:.*//')
+    video=$(jculr "$twitchvod" '.data[] | .title, .created_at' | awk -v bm=$borne_max -v offs="$offset" 'BEGIN{ if (offs > 0 ) { printf "Prev\n" } }!               (NR%2){printf ("%3d: %-100s %.10s\n", FNR/2+offs, p, $0)}{p=$0}END{ if (offs < bm) { printf "Next" } }' | $MENU_CMD -i -l 30 -p "Which video: " | sed 's/:.*//')
 
     if [ -z "$video" ];then
         twitchvod_search
@@ -193,7 +193,7 @@ curl_choose_and_watch() {
         curl_choose_and_watch
     else
         : $(( num=video-1-offset ))
-        videourl=$(echo $twitchvod | jq -r '.data['$num'].url')
+        videourl=$(jculr "$twitchvod" '.data['$num'].url')
         video_id=${videourl##*/}
         # ask for the resolution and launch the video with mpv
         if start_opt=$(grep "^$video_id" "$TIME_FILE");then

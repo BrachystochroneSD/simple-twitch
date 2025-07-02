@@ -22,6 +22,12 @@ TWITCH_ACCESS_TOKEN=$(cat "$ACCESS_TOKEN_CACHE_FILE")
 
 API="https://api.twitch.tv/helix"
 
+jculr() {
+    # This is a joke with cul = q, sorry for the confusion it could lead to, and the "beauferie" it generate
+    local input=$1 jq_options=$2
+    printf "%s\n" "$input" | jq -r "$jq_options"
+}
+
 check_internet() {
     if ! ping -q -c 1 -W 1 1.1.1.1 >/dev/null 2>&1; then
         aborted "No internet connection"
@@ -31,14 +37,14 @@ check_internet() {
 handle_error() {
     local curl_out="$1" error status message
     log "Handle Errors for $curl_out" 3
-    error=$(echo $curl_out | jq -r .error 2>/dev/null)
+    error=$(jculr "$curl_out" ".error" 2>/dev/null)
     if [ -z "$error" ] || [ "$error" = "null" ]; then
         log "No Error Found, continuing"
         return 0
     fi
     log "Error found: $error"
-    status=$(echo $curl_out | jq -r .status)
-    message=$(echo $curl_out | jq -r .message)
+    status=$(jculr "$curl_out" .status)
+    message=$(jculr "$curl_out" .message)
     if [ "$status" = 401 ] && [ "$message" = "Invalid OAuth token" ]; then
         refresh_access_token
         return 2
@@ -72,7 +78,7 @@ curl_get() {
         curl_output=$(curl_call "$opt" "$data")
         log "CURL OUTPUT: $curl_output" 3
     fi
-    echo "$curl_output"
+    printf "%s\n" "$curl_output"
 }
 
 get_token(){
