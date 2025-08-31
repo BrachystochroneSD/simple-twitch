@@ -53,7 +53,8 @@ launch_stream() {
     title=${chosen_stream#*;}
     echo "Launching Stream $stream with title '$title'"
     exec $CHAT_CMD "https://www.twitch.tv/popout/$stream/chat?darkpopout" &
-    mpv --title="${stream}:$title" "https://www.twitch.tv/$(echo $stream | tr [A-Z] [a-z])"
+    source=$(yt-dlp -g "https://www.twitch.tv/$(echo $stream | tr [A-Z] [a-z])")
+    mpv --title="${stream}:$title" "$source"
 }
 
 choose_stream() {
